@@ -16,10 +16,8 @@ sealed trait Network {
   val protocolVersion = ProtocolVersion.CURRENT
 
   def peers()(implicit ec: ExecutionContext): Future[Seq[InetSocketAddress]] = {
-    /*val listOfFutures: Seq[Future[Seq[InetSocketAddress]]] = seeds.map(s => s.discovery.peers(this))
-    Future.sequence(listOfFutures).map(_.flatten)*/
-    val address = new InetSocketAddress(InetAddress.getByName("localhost"), port)
-    Future.successful(Seq(address))
+    val listOfFutures: Seq[Future[Seq[InetSocketAddress]]] = seeds.map(s => s.discovery.peers(this))
+    Future.sequence(listOfFutures).map(_.flatten)
   }
 }
 
@@ -28,6 +26,10 @@ object Testnet3Network extends Network {
   override val magick = 0xDAB5BFFA
   override val addressHeader = 111
   override val p2shHeader = 196
-  override val seeds = Seq(DnsSeed("testnet-seed.bitcoin.schildbach.de"), DnsSeed("testnet-seed.bitcoin.petertodd.org"))
+  override val seeds = Seq(
+    DnsSeed("testnet-seed.bitcoin.schildbach.de"),
+    DnsSeed("testnet-seed.bitcoin.petertodd.org"),
+    DnsSeed("localhost")
+  )
   override val port: Int = 18333
 }

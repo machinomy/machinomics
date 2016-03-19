@@ -24,14 +24,21 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
       println("Registered")
       val versionMessage = VersionPayload(network, remote.getAddress)
       sendMessage(versionMessage)
+      context.become {
+        case Received(data) => {
+          println(data)
+        }
+        case e => println(s"GOT $e")
+      }
     }
-    case e => {
-      println(s"GOT $e")
-    }
+    case e => println(s"GOT $e")
   }
 
   def sendMessage[A: Codec](message: A) = {
-    for {
+    Codec.encode(message).map { b =>
+      println(b.toByteVector)
+    }
+    val t = for {
       bits <- Codec.encode(message)
       bytes = bits.toByteArray
     } yield sender ! Write(ByteString(bytes))
