@@ -1,13 +1,14 @@
 package one.eliot.machinomics.net.protocol
 
 import java.net.InetAddress
+
 import com.github.nscala_time.time.Imports._
-import one.eliot.machinomics.net.Network
+import one.eliot.machinomics.net.{Network, ProtocolVersion}
 import scodec._
 import codecs._
 
 
-case class VersionPayload(version: Int,
+case class VersionPayload(version: ProtocolVersion.Value,
                           services: Services = Services(),
                           timestamp: Long,
                           theirAddress: NetworkAddress,
@@ -19,7 +20,7 @@ case class VersionPayload(version: Int,
 
 object VersionPayload {
   def apply(network: Network, address: InetAddress) = {
-    val version = network.protocolVersion.number
+    val version = network.protocolVersion
     val timestamp = (DateTime.now.getMillis / 1000).toInt
     val theirAddress = NetworkAddress(address, network)
     val myAddress = NetworkAddress(InetAddress.getByName("localhost"), network)
@@ -40,7 +41,7 @@ object VersionPayload {
         bool(8)
 
   def encode(m: VersionPayload): Wire =
-    m.version ~
+    m.version.number ~
       m.services ~
       m.timestamp ~
       m.theirAddress ~
@@ -52,7 +53,7 @@ object VersionPayload {
 
   def decode(w: Wire): VersionPayload = w match {
     case version ~ services ~ timestamp ~ theirAddress ~ myAddress ~ nonce ~ userAgent ~ height ~ relayBeforeFilter =>
-      VersionPayload(version, services, timestamp, theirAddress, myAddress, nonce, userAgent, height, relayBeforeFilter)
+      VersionPayload(ProtocolVersion.Value(version), services, timestamp, theirAddress, myAddress, nonce, userAgent, height, relayBeforeFilter)
   }
 
   implicit val codec: Codec[VersionPayload] = encoding.xmap(decode(_), encode(_))

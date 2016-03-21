@@ -21,6 +21,12 @@ object NetworkAddress {
     protocolVersion = network.protocolVersion
   )
 
+  def apply(address: InetSocketAddress, network: Network) = new NetworkAddress(
+    address = address.getAddress,
+    port = address.getPort,
+    protocolVersion = network.protocolVersion
+  )
+
   val ipv4pad: ByteVector = hex"00 00 00 00 00 00 00 00 00 00 FF FF"
 
   def encode(ia: InetAddress) = {
