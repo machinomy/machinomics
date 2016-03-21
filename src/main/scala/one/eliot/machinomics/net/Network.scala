@@ -8,7 +8,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 sealed trait Network {
   val name: String
-  val magick: Int
+  val magic: Int
   val addressHeader: Int
   val p2shHeader: Int
   val seeds: Seq[Seed]
@@ -23,7 +23,7 @@ sealed trait Network {
 
 object Testnet3Network extends Network {
   override val name = "testnet3"
-  override val magick = 0xDAB5BFFA
+  override val magic = 0x0709110B
   override val addressHeader = 111
   override val p2shHeader = 196
   override val seeds = Seq(

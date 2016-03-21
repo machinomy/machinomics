@@ -22,7 +22,7 @@ object VersionPayload {
     val version = network.protocolVersion.number
     val timestamp = (DateTime.now.getMillis / 1000).toInt
     val theirAddress = NetworkAddress(address, network)
-    val myAddress = NetworkAddress(InetAddress.getLocalHost, network)
+    val myAddress = NetworkAddress(InetAddress.getByName("localhost"), network)
     val userAgent = "/Machinomics:0.0.1"
     new VersionPayload(version, Services(), timestamp, theirAddress, myAddress, 0, userAgent, 0, false)
   }
