@@ -24,43 +24,48 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
 
   IO(Tcp) ! Connect(remote)
 
-  override def receive = {
-    case CommandFailed(_: Connect) => {
-      log.error(s"Can not connect to $remote")
-    }
+  override def receive = onConnected orElse onFailedConnection orElse onSomethingUnexpected
+
+  def onConnected: Actor.Receive = {
     case c @ Connected(r, l) => {
       log.info(s"Connected to $r")
       sender ! Register(self)
       sendMessage(protocol.VersionPayload(network, remote.getAddress))
-      context.become {
-        case Received(blob) => Codec.decode[protocol.Message[protocol.VersionPayload]](BitVector(blob)) match {
-          case Successful(DecodeResult(message, _)) => {
-            services = message.payload.services
-            version  = message.payload.version
-            selfReportedAddress  = message.payload.myAddress
-            userAgent = message.payload.userAgent
-            height = message.payload.height
-            sendMessage(protocol.VerackPayload())
-            context.become {
-              case Received(b) => {
-                println("After verack:")
-                Codec.decode[protocol.Message[protocol.VerackPayload]](BitVector(b)) match {
-                  case Successful(DecodeResult(Message(v, VerackPayload()), _)) => {
-                    acked = true
-                    println(height)
-                  }
-                  case Failure(e) => println(e)
-                }
-              }
-              case e => println(e)
-            }
-          }
-          case Failure(e) => println(e)
-        }
-        case e => println(e)
-      }
+      context.become(onVersionPayloadReceived orElse onSomethingUnexpected)
     }
-    case e => println(e)
+  }
+
+  def onVersionPayloadReceived: Actor.Receive = onMessageReceived[protocol.VersionPayload] { payload =>
+    services = payload.services
+    version  = payload.version
+    selfReportedAddress  = payload.myAddress
+    userAgent = payload.userAgent
+    height = payload.height
+    sendMessage(protocol.VerackPayload())
+    context.become(onVerackPayloadReceived orElse onSomethingUnexpected)
+  }
+
+  def onVerackPayloadReceived: Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
+    acked = true
+    println(height)
+  }
+
+  def onFailedConnection: Actor.Receive = { case CommandFailed(_: Connect) =>
+    log.error(s"Can not connect to $remote")
+  }
+
+  def onSomethingUnexpected: Actor.Receive = { case e =>
+    println(e)
+  }
+
+  def onMessageReceived[A <: Payload : Codec](f: A => Unit): Actor.Receive = { case Received(blob) =>
+    protocol.Message.decode[A](blob) match {
+      case Successful(DecodeResult(message, _)) => {
+        log.info(s"Received ${message.payload.command} message")
+        f(message.payload)
+      }
+      case Failure(e) => onSomethingUnexpected(e)
+    }
   }
 
   def sendMessage[A <: protocol.Payload : Codec](payload: A) = {

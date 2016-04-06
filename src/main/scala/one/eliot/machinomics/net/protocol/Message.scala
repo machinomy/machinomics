@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.MessageDigest
 
+import akka.util.ByteString
 import one.eliot.machinomics.net.Network
 
 case class Message[A <: Payload : Codec](magic: Int, payload: A)
@@ -26,6 +27,8 @@ object Message {
       length <- uint32L.encode(payloadBytes.length)
       checksum <- uint32L.encode(checksum(payloadBytes))
     } yield magic ++ command ++ length ++ checksum ++ payloadBits
+
+  def decode[A <: Payload : Codec](bits: ByteString): Attempt[DecodeResult[Message[A]]] = decode(BitVector(bits))
 
   def decode[A <: Payload : Codec](bits: BitVector): Attempt[DecodeResult[Message[A]]] =
     for {
