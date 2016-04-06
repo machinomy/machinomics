@@ -26,13 +26,11 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
 
   override def receive = onConnected orElse onFailedConnection orElse onSomethingUnexpected
 
-  def onConnected: Actor.Receive = {
-    case c @ Connected(r, l) => {
-      log.info(s"Connected to $r")
-      sender ! Register(self)
-      sendMessage(protocol.VersionPayload(network, remote.getAddress))
-      context.become(onVersionPayloadReceived orElse onSomethingUnexpected)
-    }
+  def onConnected: Actor.Receive = { case c @ Connected(r, l) =>
+    log.info(s"Connected to $r")
+    sender ! Register(self)
+    sendMessage(protocol.VersionPayload(network, remote.getAddress))
+    context.become(onVersionPayloadReceived orElse onSomethingUnexpected)
   }
 
   def onVersionPayloadReceived: Actor.Receive = onMessageReceived[protocol.VersionPayload] { payload =>
