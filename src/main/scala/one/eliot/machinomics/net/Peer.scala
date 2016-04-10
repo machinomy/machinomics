@@ -65,7 +65,7 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   }
 
   def onHeadersReceive: Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
-    println(payload.headers.length)
+    println(payload.count)
     println(payload.headers.reverse.slice(0, 10))
   }
 

@@ -9,16 +9,16 @@ case class HeadersPayload(count: Int, headers: List[BlockHeader] = List.empty[Bl
 
 object HeadersPayload {
 
-  type Wire = Int ~ List[BlockHeader]
+  type Wire = VarInt ~ List[BlockHeader]
 
-  val encoding: Codec[Wire] = vintL ~ list(implicitly[Codec[BlockHeader]])
+  val encoding: Codec[Wire] = VarInt.codec ~ list(implicitly[Codec[BlockHeader]])
 
-  def encode(m: HeadersPayload): Wire = m.count ~ m.headers
+  def encode(m: HeadersPayload): Wire = VarInt(m.count) ~ m.headers
 
   def decode(w: Wire): HeadersPayload = w match {
 
     case count ~ headers =>
-      new HeadersPayload(count, headers)
+      new HeadersPayload(count.toInt, headers)
 
   }
 
