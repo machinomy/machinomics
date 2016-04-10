@@ -19,18 +19,18 @@ object GetHeadersPayload {
                           hashStop            = Array[Byte](0))
   }
 
-  type Wire = Int ~ Long ~ List[ByteVector] ~ ByteVector
-  val encoding: Codec[Wire] = int32L ~ int64L ~ list(bytes(32)) ~ bytes(32)
+  type Wire = Int ~ VarInt ~ List[ByteVector] ~ ByteVector
+  val encoding: Codec[Wire] = int32L ~ VarInt.codec ~ list(bytes(32)) ~ bytes(32)
 
 
   def encode(m: GetHeadersPayload): Wire =
-    m.version.number ~ m.hashCount ~ m.blockLocatorHashes.map(ByteVector(_)) ~ ByteVector(m.hashStop)
+    m.version.number ~ VarInt(m.hashCount) ~ m.blockLocatorHashes.map(ByteVector(_).reverse) ~ ByteVector(m.hashStop)
 
 
   def decode(w: Wire): GetHeadersPayload = w match {
 
     case version ~ hashCount ~ blockLocatorHashes ~ hashStop =>
-      GetHeadersPayload(ProtocolVersion.Value(version), hashCount, blockLocatorHashes.map(_.toArray), hashStop.toArray)
+      GetHeadersPayload(ProtocolVersion.Value(version), hashCount.toInt, blockLocatorHashes.map(_.toArray), hashStop.toArray)
 
   }
 

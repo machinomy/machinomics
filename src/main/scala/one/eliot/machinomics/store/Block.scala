@@ -34,7 +34,7 @@ case class BlockHeader(version: Int,
                        txCount: Int) {
 
   lazy val hash: Hash = {
-    Hash.doubleSHA256(Codec.encode(this).getOrElse(BitVector.empty).toByteArray.slice(0, 80))
+    Hash.doubleSHA256(Codec.encode(this).getOrElse(BitVector.empty).toByteArray.slice(0, 80)).reverse
   }
 
   override def toString: String = {
@@ -49,13 +49,13 @@ object BlockHeader {
   val encoding: Codec[Wire] = int32L ~ bytes(32) ~ bytes(32) ~ uint32L ~ uint32L ~ uint32L ~ vintL
 
   def encode(m: BlockHeader): Wire =
-    m.version ~ ByteVector(m.prevBlockHash) ~ ByteVector(m.merkleRoot) ~ m.timestamp ~ m.bits ~ m.nonce ~ m.txCount
+    m.version ~ ByteVector(m.prevBlockHash).reverse ~ ByteVector(m.merkleRoot).reverse ~ m.timestamp ~ m.bits ~ m.nonce ~ m.txCount
 
 
   def decode(w: Wire): BlockHeader = w match {
 
     case version ~ prevBlockHash ~ merkleRoot ~ timestamp ~ bits ~ nonce ~ txCount =>
-      new BlockHeader(version, prevBlockHash.toArray.reverse, merkleRoot.toArray.reverse, timestamp, bits, nonce, txCount)
+      new BlockHeader(version, prevBlockHash.reverse.toArray, merkleRoot.reverse.toArray, timestamp, bits, nonce, txCount)
 
   }
 

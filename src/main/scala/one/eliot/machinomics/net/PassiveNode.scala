@@ -17,7 +17,7 @@ class PassiveNode(network: Network) extends Actor with Node with ActorLogging {
       log.info(s"Starting passive node for ${network.name}")
       network.peers().onSuccess {
         case addresses: Seq[InetSocketAddress] =>
-          val selected = Random.shuffle(addresses.filter(_.getAddress.isInstanceOf[Inet4Address])).take(10)
+          val selected = Random.shuffle(addresses.filter(_.getAddress.isInstanceOf[Inet4Address])).take(5)
           peers = for (addr <- selected) yield context.actorOf(Peer.props(addr, self, network))
       }
     }

@@ -5,10 +5,12 @@ import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
+import one.eliot.machinomics.Hash
 import one.eliot.machinomics.net.protocol._
+import one.eliot.machinomics.store.BlockHeader
 import scodec.Attempt.{Failure, Successful}
 import scodec._
-import scodec.bits.BitVector
+import scodec.bits._
 
 class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends Actor with ActorLogging {
 
@@ -25,6 +27,8 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   var receivedNumber = 0
 
   var buffer = ByteString.newBuilder
+
+  var blockHeaderCount = 0
 
   IO(Tcp) ! Connect(remote)
 
@@ -52,12 +56,13 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
     println(height)
 
     //TODO: remove hardcoded genesis block
-    val genesisHashString = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
-    val genesisHash = genesisHashString
-      .replaceAll("[^0-9A-Fa-f]", "")
-      .sliding(2, 2)
-      .toArray
-      .map(Integer.parseInt(_, 16).toByte)
+//    val genesisHashString = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
+    val genesisHash = hex"0000000005bdbddb59a3cd33b69db94fa67669c41d9d32751512b5d7b68c71cf".toArray
+//    val genesisHash = genesisHashString
+//      .replaceAll("[^0-9A-Fa-f]", "")
+//      .sliding(2, 2)
+//      .toArray
+//      .map(Integer.parseInt(_, 16).toByte)
 
     sendMessage(protocol.GetHeadersPayload(List(genesisHash)))
 
@@ -65,8 +70,22 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   }
 
   def onHeadersReceive: Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
-    println(payload.count)
-    println(payload.headers.reverse.slice(0, 10))
+    blockHeaderCount += payload.count
+
+    log.info(s"downloaded: $blockHeaderCount headers")
+
+    if (blockHeaderCount < height) {
+      val headersSent = payload.headers.takeRight(10)
+      log.info(headersSent.map(x => Hash.toString(x.hash)).mkString("; "))
+      sendMessage(protocol.GetHeadersPayload(headersSent.map(_.hash)))
+      log.info(s"last: ${Hash.toString(payload.headers.last.hash)}, ${payload.headers.last} ${ByteString(payload.headers.last.hash)}")
+      context.become(onHeadersReceive orElse onSomethingUnexpected)
+    }
+
+    else {
+//      log.info(s"last: ${payload.headers.reverse.take(10).map((x: BlockHeader) => Hash.toString(x.hash))}")
+      log.info(s"last: ${Hash.toString(payload.headers.last.hash)}, ${payload.headers.last}")
+    }
   }
 
   def onFailedConnection: Actor.Receive = { case CommandFailed(_: Connect) =>
@@ -82,7 +101,6 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
     buffer.append(blob)
     protocol.Message.decode[A](buffer.result()) match {
       case Successful(DecodeResult(message, _)) =>
-        log.warning(buffer.result().length.toString)
         buffer.clear()
         log.info(s"Received ${message.payload.command} message")
         f(message.payload)
