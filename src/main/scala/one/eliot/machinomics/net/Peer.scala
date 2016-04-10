@@ -22,6 +22,10 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   var height:     Int = 0
   var acked:      Boolean = false
 
+  var receivedNumber = 0
+
+  var buffer = ByteString.newBuilder
+
   IO(Tcp) ! Connect(remote)
 
   override def receive = onConnected orElse onFailedConnection orElse onSomethingUnexpected
@@ -46,6 +50,23 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   def onVerackPayloadReceived: Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
     acked = true
     println(height)
+
+    //TODO: remove hardcoded genesis block
+    val genesisHashString = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
+    val genesisHash = genesisHashString
+      .replaceAll("[^0-9A-Fa-f]", "")
+      .sliding(2, 2)
+      .toArray
+      .map(Integer.parseInt(_, 16).toByte)
+
+    sendMessage(protocol.GetHeadersPayload(List(genesisHash)))
+
+    context.become(onHeadersReceive orElse onSomethingUnexpected)
+  }
+
+  def onHeadersReceive: Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
+    println(payload.headers.length)
+    println(payload.headers.reverse.slice(0, 10))
   }
 
   def onFailedConnection: Actor.Receive = { case CommandFailed(_: Connect) =>
@@ -53,16 +74,19 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   }
 
   def onSomethingUnexpected: Actor.Receive = { case e =>
-    println(e)
+    log.info(e.toString)
   }
 
   def onMessageReceived[A <: Payload : Codec](f: A => Unit): Actor.Receive = { case Received(blob) =>
-    protocol.Message.decode[A](blob) match {
-      case Successful(DecodeResult(message, _)) => {
+    // TODO: remove buffer
+    buffer.append(blob)
+    protocol.Message.decode[A](buffer.result()) match {
+      case Successful(DecodeResult(message, _)) =>
+        log.warning(buffer.result().length.toString)
+        buffer.clear()
         log.info(s"Received ${message.payload.command} message")
         f(message.payload)
-      }
-      case Failure(e) => onSomethingUnexpected(e)
+      case Failure(e) =>
     }
   }
 
