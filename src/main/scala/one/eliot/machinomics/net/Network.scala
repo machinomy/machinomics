@@ -1,9 +1,8 @@
 package one.eliot.machinomics.net
 
-import java.net.{InetAddress, InetSocketAddress}
-
-import one.eliot.machinomics.net.discovery.{Seed, DnsSeed}
-
+import java.net.InetSocketAddress
+import one.eliot.machinomics.blockchain.DoubleHash
+import one.eliot.machinomics.net.discovery.{DnsSeed, Seed}
 import scala.concurrent.{ExecutionContext, Future}
 
 sealed trait Network {
@@ -14,6 +13,7 @@ sealed trait Network {
   val seeds: Seq[Seed]
   val port: Int
   val protocolVersion = ProtocolVersion.CURRENT
+  val genesisHash: DoubleHash
 
   def peers()(implicit ec: ExecutionContext): Future[Seq[InetSocketAddress]] = {
     val listOfFutures: Seq[Future[Seq[InetSocketAddress]]] = seeds.map(s => s.discovery.peers(this))
@@ -32,4 +32,5 @@ object Testnet3Network extends Network {
     DnsSeed("localhost")
   )
   override val port: Int = 18333
+  override val genesisHash = DoubleHash.fromHex("0000000005bdbddb59a3cd33b69db94fa67669c41d9d32751512b5d7b68c71cf")
 }

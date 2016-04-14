@@ -53,18 +53,7 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
   def onVerackPayloadReceived: Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
     acked = true
     println(height)
-
-    //TODO: remove hardcoded genesis block
-//    val genesisHashString = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
-    val genesisHash = DoubleHash(hex"0000000005bdbddb59a3cd33b69db94fa67669c41d9d32751512b5d7b68c71cf".toArray)
-//    val genesisHash = genesisHashString
-//      .replaceAll("[^0-9A-Fa-f]", "")
-//      .sliding(2, 2)
-//      .toArray
-//      .map(Integer.parseInt(_, 16).toByte)
-
-    sendMessage(protocol.GetHeadersPayload(List(genesisHash)))
-
+    sendMessage(protocol.GetHeadersPayload(List(network.genesisHash)))
     context.become(onHeadersReceive orElse onSomethingUnexpected)
   }
 
