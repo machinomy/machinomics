@@ -6,14 +6,14 @@ import akka.actor.{ActorLogging, ActorRef, Actor}
 
 import scala.util.Random
 
-class PassiveNode(network: Network) extends Actor with Node with ActorLogging {
+class PassiveHerd(network: Network) extends Actor with Herd with ActorLogging {
 
   var peers: Seq[ActorRef] = Seq.empty
 
   implicit val ec = context.dispatcher
 
   override def receive = {
-    case Node.Start() => {
+    case Herd.Start() => {
       log.info(s"Starting passive node for ${network.name}")
       network.peers().onSuccess {
         case addresses: Seq[InetSocketAddress] =>
@@ -21,6 +21,6 @@ class PassiveNode(network: Network) extends Actor with Node with ActorLogging {
           peers = for (addr <- selected) yield context.actorOf(Peer.props(addr, self, network))
       }
     }
-    case Node.Stop() => log.info(s"Stopping passive node for ${network.name}")
+    case Herd.Stop() => log.info(s"Stopping passive node for ${network.name}")
   }
 }
