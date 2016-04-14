@@ -1,5 +1,7 @@
 package one.eliot.machinomics.net
 
-class Node {
+case class Node(state: NodeState)
 
+object Node {
+  def apply(network: Network): Node = Node(NodeState(network))
 }
