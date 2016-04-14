@@ -35,27 +35,21 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     log.info(s"Connected to $r")
     sender ! Register(self)
     sendMessage(protocol.VersionPayload(network, remote.getAddress))
-    context.become(onVersionPayloadReceived orElse onSomethingUnexpected)
+    val initialState = PeerState.Initial(network, NetworkAddress(remote, network))
+    context.become(onVersionPayloadReceived(initialState) orElse onSomethingUnexpected)
   }
 
-  def onVersionPayloadReceived: Actor.Receive = onMessageReceived[protocol.VersionPayload] { payload =>
-    services = payload.services
-    version  = payload.version
-    selfReportedAddress  = payload.myAddress
-    userAgent = payload.userAgent
-    height = payload.height
-    log.info(height.toString)
-    sendMessage(protocol.VerackPayload())
-    val connectedPeerState = PeerState.Connected(
-      network = network,
-      address = NetworkAddress(remote, network),
-      selfReportedAddress = selfReportedAddress,
-      services = services,
-      version = version,
-      userAgent = userAgent,
-      height = height
+  def onVersionPayloadReceived(state: PeerState.Initial): Actor.Receive = onMessageReceived[protocol.VersionPayload] { payload =>
+    val nextState = state.connected(
+      selfReportedAddress = payload.myAddress,
+      services = payload.services,
+      version = payload.version,
+      userAgent = payload.userAgent,
+      height = payload.height
     )
-    context.become(onVerackPayloadReceived(connectedPeerState) orElse onSomethingUnexpected)
+    log.info(s"Done version handshake with ${state.address}")
+    sendMessage(protocol.VerackPayload())
+    context.become(onVerackPayloadReceived(nextState) orElse onSomethingUnexpected)
   }
 
   def onVerackPayloadReceived(state: PeerState.Connected): Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
