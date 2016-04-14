@@ -36,28 +36,25 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     log.info(s"Connected to $r")
     sender ! Register(self)
     sendMessage(protocol.VersionPayload(state.network, state.address))
-    val nextState = state.initial
-    context.become(onVersionPayloadReceived(nextState) orElse onSomethingUnexpected)
+    become(onVersionPayloadReceived, state.initial)
   }
 
   def onVersionPayloadReceived(state: PeerState.Initial): Receive = onMessageReceived[protocol.VersionPayload] { payload =>
     log.info(s"Done version handshake with ${state.address}")
     sendMessage(protocol.VerackPayload())
-    val nextState = state.connected(
+    become(onVerackPayloadReceived, state.connected(
       selfReportedAddress = payload.myAddress,
       services = payload.services,
       version = payload.version,
       userAgent = payload.userAgent,
       height = payload.height
-    )
-    context.become(onVerackPayloadReceived(nextState) orElse onSomethingUnexpected)
+    ))
   }
 
   def onVerackPayloadReceived(state: PeerState.Connected): Receive = onMessageReceived[protocol.VerackPayload] { payload =>
     log.info(s"Acknowledged connection to ${state.address}")
     sendMessage(protocol.GetHeadersPayload(state.network.genesisHash))
-    val nextState = state.acknowledged
-    context.become(onHeadersReceive(nextState) orElse onSomethingUnexpected)
+    become(onHeadersReceive, state.acknowledged)
   }
 
   def onHeadersReceive(state: PeerState.Acknowledged): Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
@@ -86,6 +83,8 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   def onSomethingUnexpected: Receive = { case e =>
     log.error(e.toString)
   }
+
+  def become[S](behavior: S => Receive, nextState: S) = context.become(behavior(nextState) orElse onSomethingUnexpected)
 
   def onMessageReceived[A <: Payload : Codec](f: A => Unit): Receive = { case Received(blob) =>
     // TODO: remove buffer
