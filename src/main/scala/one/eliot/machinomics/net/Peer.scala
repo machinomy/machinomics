@@ -2,10 +2,9 @@ package one.eliot.machinomics.net
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
-import one.eliot.machinomics.blockchain.DoubleHash
 import one.eliot.machinomics.net.protocol._
 import scodec.Attempt.{Failure, Successful}
 import scodec._
@@ -54,20 +53,30 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     acked = true
     println(height)
     sendMessage(protocol.GetHeadersPayload(List(network.genesisHash)))
-    context.become(onHeadersReceive orElse onSomethingUnexpected)
+    val connectedPeerState = ConnectedPeerState(
+      network = network,
+      address = NetworkAddress(remote, network),
+      selfReportedAddress = selfReportedAddress,
+      services = services,
+      version = version,
+      userAgent = userAgent,
+      height = height,
+      acked = true
+    )
+    context.become(onHeadersReceive(connectedPeerState) orElse onSomethingUnexpected)
   }
 
-  def onHeadersReceive: Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
+  def onHeadersReceive(state: ConnectedPeerState): Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
     blockHeaderCount += payload.count
 
     log.info(s"downloaded: $blockHeaderCount headers")
 
-    if (blockHeaderCount < height) {
+    if (blockHeaderCount < state.height) {
       val headersSent = payload.headers.takeRight(10)
       log.info(headersSent.map(x => x.hash).mkString("; "))
       sendMessage(protocol.GetHeadersPayload(headersSent.map(_.hash)))
       log.info(s"last: ${payload.headers.last.hash.toString}, ${payload.headers.last} ${ByteString(payload.headers.last.hash.toString)}")
-      context.become(onHeadersReceive orElse onSomethingUnexpected)
+      context.become(onHeadersReceive(state) orElse onSomethingUnexpected)
     }
 
     else {
