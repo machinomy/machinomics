@@ -17,9 +17,5 @@ package object machinomics {
       SHA256(SHA256(data))
     }
 
-    def toString(data: Hash) = {
-      data.map("%02x".format(_)).mkString
-    }
-
   }
 }

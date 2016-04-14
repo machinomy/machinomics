@@ -1,8 +1,8 @@
 package one.eliot.machinomics.net.protocol
 
-import one.eliot.machinomics.store.BlockHeader
 import scodec._
 import codecs._
+import one.eliot.machinomics.blockchain.BlockHeader
 
 case class HeadersPayload(count: Int, headers: List[BlockHeader] = List.empty[BlockHeader]) extends Payload("headers")
 

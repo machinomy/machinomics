@@ -1,6 +1,6 @@
 package one.eliot.machinomics.net.protocol
 
-import one.eliot.machinomics.Hash
+import one.eliot.machinomics.blockchain.DoubleHash
 import one.eliot.machinomics.net.ProtocolVersion
 import scodec.Codec
 import scodec.bits.ByteVector
@@ -8,15 +8,15 @@ import scodec.codecs._
 
 case class GetHeadersPayload(version: ProtocolVersion.Value,
                              hashCount: Long,
-                             blockLocatorHashes: List[Hash],
-                             hashStop: Hash) extends Payload("getheaders")
+                             blockLocatorHashes: List[DoubleHash],
+                             hashStop: DoubleHash) extends Payload("getheaders")
 
 object GetHeadersPayload {
-  def apply(blockLocatorHashes: List[Hash]) = {
+  def apply(blockLocatorHashes: List[DoubleHash]) = {
     new GetHeadersPayload(version             = ProtocolVersion.CURRENT,
                           hashCount           = blockLocatorHashes.length,
                           blockLocatorHashes  = blockLocatorHashes,
-                          hashStop            = Array[Byte](0))
+                          hashStop            = DoubleHash.zero)
   }
 
   type Wire = Int ~ VarInt ~ List[ByteVector] ~ ByteVector
@@ -24,13 +24,13 @@ object GetHeadersPayload {
 
 
   def encode(m: GetHeadersPayload): Wire =
-    m.version.number ~ VarInt(m.hashCount) ~ m.blockLocatorHashes.map(ByteVector(_).reverse) ~ ByteVector(m.hashStop)
+    m.version.number ~ VarInt(m.hashCount) ~ m.blockLocatorHashes.map(b => ByteVector(b.bytes).reverse) ~ ByteVector(m.hashStop.bytes)
 
 
   def decode(w: Wire): GetHeadersPayload = w match {
 
     case version ~ hashCount ~ blockLocatorHashes ~ hashStop =>
-      GetHeadersPayload(ProtocolVersion.Value(version), hashCount.toInt, blockLocatorHashes.map(_.toArray), hashStop.toArray)
+      GetHeadersPayload(ProtocolVersion.Value(version), hashCount.toInt, blockLocatorHashes.map(v => DoubleHash(v.toArray)), DoubleHash(hashStop.toArray))
 
   }
 
