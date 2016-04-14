@@ -20,7 +20,6 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   var selfReportedAddress:    NetworkAddress = NetworkAddress(remote, network)
   var userAgent:  String = ""
   var height:     Int = 0
-  var acked:      Boolean = false
 
   var receivedNumber = 0
 
@@ -45,15 +44,9 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     selfReportedAddress  = payload.myAddress
     userAgent = payload.userAgent
     height = payload.height
+    log.info(height.toString)
     sendMessage(protocol.VerackPayload())
-    context.become(onVerackPayloadReceived orElse onSomethingUnexpected)
-  }
-
-  def onVerackPayloadReceived: Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
-    acked = true
-    println(height)
-    sendMessage(protocol.GetHeadersPayload(List(network.genesisHash)))
-    val connectedPeerState = PeerState.Acked(
+    val connectedPeerState = PeerState.Connected(
       network = network,
       address = NetworkAddress(remote, network),
       selfReportedAddress = selfReportedAddress,
@@ -62,10 +55,17 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
       userAgent = userAgent,
       height = height
     )
-    context.become(onHeadersReceive(connectedPeerState) orElse onSomethingUnexpected)
+    context.become(onVerackPayloadReceived(connectedPeerState) orElse onSomethingUnexpected)
   }
 
-  def onHeadersReceive(state: PeerState.Acked): Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
+  def onVerackPayloadReceived(state: PeerState.Connected): Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
+    log.info(s"Acknowledged connection to ${state.address}")
+    val nextState = state.acknowledged
+    sendMessage(protocol.GetHeadersPayload(state.network.genesisHash))
+    context.become(onHeadersReceive(nextState) orElse onSomethingUnexpected)
+  }
+
+  def onHeadersReceive(state: PeerState.Acknowledged): Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
     blockHeaderCount += payload.count
 
     log.info(s"downloaded: $blockHeaderCount headers")

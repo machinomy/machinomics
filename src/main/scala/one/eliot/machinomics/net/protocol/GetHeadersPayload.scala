@@ -11,12 +11,14 @@ case class GetHeadersPayload(version: ProtocolVersion.Value,
                              hashStop: DoubleHash) extends Payload("getheaders")
 
 object GetHeadersPayload {
-  def apply(blockLocatorHashes: List[DoubleHash]) = {
+  def apply(blockLocatorHashes: List[DoubleHash]): GetHeadersPayload = {
     new GetHeadersPayload(version             = ProtocolVersion.CURRENT,
                           hashCount           = blockLocatorHashes.length,
                           blockLocatorHashes  = blockLocatorHashes,
                           hashStop            = DoubleHash.zero)
   }
+
+  def apply(blockLocatorHash: DoubleHash): GetHeadersPayload = apply(List(blockLocatorHash))
 
   type Wire = Int ~ VarInt ~ List[DoubleHash] ~ DoubleHash
   val encoding: Codec[Wire] = int32L ~ VarInt.codec ~ list(implicitly[Codec[DoubleHash]]) ~ implicitly[Codec[DoubleHash]]

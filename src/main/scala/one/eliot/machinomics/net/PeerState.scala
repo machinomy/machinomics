@@ -11,13 +11,16 @@ object PeerState{
                        services: Services,
                        version: ProtocolVersion.Value,
                        userAgent: String,
-                       height: Long) extends PeerState
+                       height: Long) extends PeerState {
 
-  case class Acked(network: Network,
-                   address: NetworkAddress,
-                   selfReportedAddress: NetworkAddress,
-                   services: Services,
-                   version: ProtocolVersion.Value,
-                   userAgent: String,
-                   height: Long) extends PeerState
+    def acknowledged = Acknowledged(network, address, selfReportedAddress, services, version, userAgent, height)
+  }
+
+  case class Acknowledged(network: Network,
+                          address: NetworkAddress,
+                          selfReportedAddress: NetworkAddress,
+                          services: Services,
+                          version: ProtocolVersion.Value,
+                          userAgent: String,
+                          height: Long) extends PeerState
 }
