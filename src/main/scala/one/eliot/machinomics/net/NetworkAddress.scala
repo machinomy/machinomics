@@ -1,18 +1,21 @@
-package one.eliot.machinomics.net.protocol
+package one.eliot.machinomics.net
 
-import java.net.{InetSocketAddress, InetAddress}
+import java.net.{InetAddress, InetSocketAddress}
 
-import one.eliot.machinomics.net.{Network, ProtocolVersion}
 import org.joda.time.DateTime
 import scodec._
 import scodec.bits._
-import codecs._
+import scodec.codecs._
 
 case class NetworkAddress(address: InetAddress,
                           port: Int,
                           services: Services = Services(),
                           protocolVersion: ProtocolVersion.Value = ProtocolVersion.CURRENT,
-                          time: Option[DateTime] = None)
+                          time: Option[DateTime] = None) {
+
+  def inetSocketAddress: InetSocketAddress = new InetSocketAddress(address, port)
+
+}
 
 object NetworkAddress {
   def apply(address: InetAddress, network: Network) = new NetworkAddress(

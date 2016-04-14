@@ -1,4 +1,4 @@
-package one.eliot.machinomics.net.protocol
+package one.eliot.machinomics.net
 
 import scodec.Codec
 import scodec.codecs.int64L
