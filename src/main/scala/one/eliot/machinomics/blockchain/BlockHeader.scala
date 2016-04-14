@@ -1,9 +1,8 @@
 package one.eliot.machinomics.blockchain
 
-import one.eliot.machinomics.Hash
 import scodec.Codec
-import scodec.bits.{BitVector, ByteVector}
-import scodec.codecs.{~, _}
+import scodec.bits._
+import scodec.codecs._
 
 case class BlockHeader(version: Int,
                        prevBlockHash: DoubleHash,
@@ -13,10 +12,7 @@ case class BlockHeader(version: Int,
                        nonce: Long,
                        txCount: Int) {
 
-  lazy val hash: DoubleHash = {
-    val bytes = Hash.doubleSHA256(Codec.encode(this).getOrElse(BitVector.empty).toByteArray.slice(0, 80)).reverse
-    DoubleHash(bytes)
-  }
+  lazy val hash = BlockHeader.hash(this)
 
   override def toString: String = {
     s"""BlockHeader(version: $version, prevBlockHash: ${prevBlockHash.toString}, merkleRoot: ${merkleRoot.toString}, timestamp: $timestamp, bits: $bits, nonce: $nonce, txCount: $txCount)"""
@@ -26,18 +22,23 @@ case class BlockHeader(version: Int,
 
 object BlockHeader {
 
-  type Wire = Int ~ ByteVector ~ ByteVector ~ Long ~ Long ~ Long ~ Int
+  def hash(blockHeader: BlockHeader) = {
+    val bytes = Codec.encode(blockHeader).getOrElse(BitVector.empty).toByteArray.slice(0, 80)
+    DoubleHash.digest(bytes)
+  }
 
-  val encoding: Codec[Wire] = int32L ~ bytes(32) ~ bytes(32) ~ uint32L ~ uint32L ~ uint32L ~ vintL
+  type Wire = Int ~ DoubleHash ~ DoubleHash ~ Long ~ Long ~ Long ~ Int
+
+  val encoding: Codec[Wire] = int32L ~ implicitly[Codec[DoubleHash]] ~ implicitly[Codec[DoubleHash]] ~ uint32L ~ uint32L ~ uint32L ~ vintL
 
   def encode(m: BlockHeader): Wire =
-    m.version ~ ByteVector(m.prevBlockHash.bytes).reverse ~ ByteVector(m.merkleRoot.bytes).reverse ~ m.timestamp ~ m.bits ~ m.nonce ~ m.txCount
+    m.version ~ m.prevBlockHash ~ m.merkleRoot ~ m.timestamp ~ m.bits ~ m.nonce ~ m.txCount
 
 
   def decode(w: Wire): BlockHeader = w match {
 
     case version ~ prevBlockHash ~ merkleRoot ~ timestamp ~ bits ~ nonce ~ txCount =>
-      new BlockHeader(version, DoubleHash(prevBlockHash.reverse.toArray), DoubleHash(merkleRoot.reverse.toArray), timestamp, bits, nonce, txCount)
+      new BlockHeader(version, prevBlockHash, merkleRoot, timestamp, bits, nonce, txCount)
 
   }
 
