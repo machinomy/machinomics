@@ -53,20 +53,19 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     acked = true
     println(height)
     sendMessage(protocol.GetHeadersPayload(List(network.genesisHash)))
-    val connectedPeerState = ConnectedPeerState(
+    val connectedPeerState = PeerState.Acked(
       network = network,
       address = NetworkAddress(remote, network),
       selfReportedAddress = selfReportedAddress,
       services = services,
       version = version,
       userAgent = userAgent,
-      height = height,
-      acked = true
+      height = height
     )
     context.become(onHeadersReceive(connectedPeerState) orElse onSomethingUnexpected)
   }
 
-  def onHeadersReceive(state: ConnectedPeerState): Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
+  def onHeadersReceive(state: PeerState.Acked): Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
     blockHeaderCount += payload.count
 
     log.info(s"downloaded: $blockHeaderCount headers")
@@ -90,7 +89,7 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   }
 
   def onSomethingUnexpected: Actor.Receive = { case e =>
-    log.info(e.toString)
+    log.error(e.toString)
   }
 
   def onMessageReceived[A <: Payload : Codec](f: A => Unit): Actor.Receive = { case Received(blob) =>
