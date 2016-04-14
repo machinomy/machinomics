@@ -15,14 +15,6 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   import Tcp._
   import context.system
 
-  var services:   Services = Services()
-  var version:    ProtocolVersion.Value = network.protocolVersion
-  var selfReportedAddress:    NetworkAddress = NetworkAddress(remote, network)
-  var userAgent:  String = ""
-  var height:     Int = 0
-
-  var receivedNumber = 0
-
   var buffer = ByteString.newBuilder
 
   var blockHeaderCount = 0
