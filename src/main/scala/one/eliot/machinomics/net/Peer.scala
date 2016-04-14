@@ -11,7 +11,7 @@ import scodec.Attempt.{Failure, Successful}
 import scodec._
 import scodec.bits._
 
-class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends Actor with ActorLogging {
+class Peer(remote: InetSocketAddress, network: Network) extends Actor with ActorLogging {
 
   import Tcp._
   import context.system
@@ -108,5 +108,5 @@ class Peer(remote: InetSocketAddress, node: ActorRef, network: Network) extends 
 }
 
 object Peer {
-  def props(remote: InetSocketAddress, node: ActorRef, network: Network) = Props(classOf[Peer], remote, node, network)
+  def props(remote: InetSocketAddress, network: Network) = Props(classOf[Peer], remote, network)
 }
