@@ -7,5 +7,5 @@ object PrintBlockchainHeights extends App {
   implicit val actorSystem = ActorSystem("foo")
   val network = Testnet3Network
   val node = actorSystem.actorOf(Props(classOf[Herd], network))
-  node ! Herd.Start()
+  node ! Herd.Connect()
 }

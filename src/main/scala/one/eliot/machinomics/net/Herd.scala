@@ -13,7 +13,7 @@ class Herd(network: Network) extends Actor with ActorLogging {
   implicit val ec = context.dispatcher
 
   override def receive = {
-    case Herd.Start() => {
+    case Herd.Connect() => {
       log.info(s"Starting passive node for ${network.name}")
       network.peers().onSuccess {
         case addresses: Seq[InetSocketAddress] =>
@@ -21,12 +21,12 @@ class Herd(network: Network) extends Actor with ActorLogging {
           peers = for (addr <- selected) yield context.actorOf(Peer.props(addr, network))
       }
     }
-    case Herd.Stop() => log.info(s"Stopping passive node for ${network.name}")
+    case Herd.Disconnect() => log.info(s"Stopping passive node for ${network.name}")
   }
 }
 
 object Herd {
   sealed trait Message
-  case class Start() extends Message
-  case class Stop() extends Message
+  case class Connect() extends Message
+  case class Disconnect() extends Message
 }
