@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor._
 import akka.io.{IO, Tcp}
-import akka.util.ByteString
+import akka.util.{ByteString, ByteStringBuilder}
 import one.eliot.machinomics.net.protocol._
 import scodec.Attempt.{Failure, Successful}
 import scodec._
@@ -14,8 +14,6 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
 
   import Tcp._
   import context.system
-
-  var buffer = ByteString.newBuilder
 
   var blockHeaderCount = 0
 
@@ -78,7 +76,7 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
 
   def become[S](behavior: S => Receive, nextState: S) = context.become(behavior(nextState) orElse onSomethingUnexpected)
 
-  def onMessageReceived[A <: Payload : Codec](f: A => Unit): Receive = { case Received(blob) =>
+  def onMessageReceived[A <: Payload : Codec](f: A => Unit, buffer: ByteStringBuilder = ByteString.newBuilder): Receive = { case Received(blob) =>
     // TODO: remove buffer
     buffer.append(blob)
     protocol.Message.decode[A](buffer.result()) match {
@@ -87,6 +85,7 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
         log.info(s"Received ${message.payload.command} message")
         f(message.payload)
       case Failure(e) =>
+        context.become(onMessageReceived(f, buffer) orElse onSomethingUnexpected)
     }
   }
 
