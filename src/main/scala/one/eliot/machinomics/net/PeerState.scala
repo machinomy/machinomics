@@ -3,6 +3,10 @@ package one.eliot.machinomics.net
 sealed trait PeerState
 
 object PeerState{
+  case class Empty(network: Network, address: NetworkAddress) extends PeerState {
+    def initial = Initial(network, address)
+  }
+
   case class Initial(network: Network, address: NetworkAddress) extends PeerState {
     def connected(selfReportedAddress: NetworkAddress,
                   services: Services,

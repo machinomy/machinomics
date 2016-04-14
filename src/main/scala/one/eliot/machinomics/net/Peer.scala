@@ -2,7 +2,7 @@ package one.eliot.machinomics.net
 
 import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor._
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import one.eliot.machinomics.net.protocol._
@@ -29,17 +29,18 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
 
   IO(Tcp) ! Connect(remote)
 
-  override def receive = onConnected orElse onFailedConnection orElse onSomethingUnexpected
+  var emptyState = PeerState.Empty(network, NetworkAddress(remote, network))
+  override def receive = onConnected(emptyState) orElse onFailedConnection orElse onSomethingUnexpected
 
-  def onConnected: Actor.Receive = { case c @ Connected(r, l) =>
+  def onConnected(state: PeerState.Empty): Receive = { case c @ Connected(r, l) =>
     log.info(s"Connected to $r")
     sender ! Register(self)
-    sendMessage(protocol.VersionPayload(network, remote.getAddress))
-    val initialState = PeerState.Initial(network, NetworkAddress(remote, network))
-    context.become(onVersionPayloadReceived(initialState) orElse onSomethingUnexpected)
+    sendMessage(protocol.VersionPayload(state.network, state.address))
+    val nextState = state.initial
+    context.become(onVersionPayloadReceived(nextState) orElse onSomethingUnexpected)
   }
 
-  def onVersionPayloadReceived(state: PeerState.Initial): Actor.Receive = onMessageReceived[protocol.VersionPayload] { payload =>
+  def onVersionPayloadReceived(state: PeerState.Initial): Receive = onMessageReceived[protocol.VersionPayload] { payload =>
     log.info(s"Done version handshake with ${state.address}")
     sendMessage(protocol.VerackPayload())
     val nextState = state.connected(
@@ -52,14 +53,14 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     context.become(onVerackPayloadReceived(nextState) orElse onSomethingUnexpected)
   }
 
-  def onVerackPayloadReceived(state: PeerState.Connected): Actor.Receive = onMessageReceived[protocol.VerackPayload] { payload =>
+  def onVerackPayloadReceived(state: PeerState.Connected): Receive = onMessageReceived[protocol.VerackPayload] { payload =>
     log.info(s"Acknowledged connection to ${state.address}")
     sendMessage(protocol.GetHeadersPayload(state.network.genesisHash))
     val nextState = state.acknowledged
     context.become(onHeadersReceive(nextState) orElse onSomethingUnexpected)
   }
 
-  def onHeadersReceive(state: PeerState.Acknowledged): Actor.Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
+  def onHeadersReceive(state: PeerState.Acknowledged): Receive = onMessageReceived[protocol.HeadersPayload] { payload =>
     blockHeaderCount += payload.count
 
     log.info(s"downloaded: $blockHeaderCount headers")
@@ -78,15 +79,15 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     }
   }
 
-  def onFailedConnection: Actor.Receive = { case CommandFailed(_: Connect) =>
+  def onFailedConnection: Receive = { case CommandFailed(_: Connect) =>
     log.error(s"Can not connect to $remote")
   }
 
-  def onSomethingUnexpected: Actor.Receive = { case e =>
+  def onSomethingUnexpected: Receive = { case e =>
     log.error(e.toString)
   }
 
-  def onMessageReceived[A <: Payload : Codec](f: A => Unit): Actor.Receive = { case Received(blob) =>
+  def onMessageReceived[A <: Payload : Codec](f: A => Unit): Receive = { case Received(blob) =>
     // TODO: remove buffer
     buffer.append(blob)
     protocol.Message.decode[A](buffer.result()) match {
