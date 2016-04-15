@@ -3,7 +3,7 @@ package one.eliot.machinomics.net.protocol
 import java.net.InetAddress
 
 import com.github.nscala_time.time.Imports._
-import one.eliot.machinomics.net.{Network, ProtocolVersion}
+import one.eliot.machinomics.net.{Network, NetworkAddress, ProtocolVersion, Services}
 import scodec._
 import codecs._
 
@@ -19,13 +19,17 @@ case class VersionPayload(version: ProtocolVersion.Value,
                           relayBeforeFilter: Boolean = true) extends Payload("version")
 
 object VersionPayload {
-  def apply(network: Network, address: InetAddress) = {
+  def apply(network: Network, address: InetAddress): VersionPayload = {
+    val theirAddress = NetworkAddress(address, network)
+    apply(network, theirAddress)
+  }
+
+  def apply(network: Network, address: NetworkAddress): VersionPayload = {
     val version = network.protocolVersion
     val timestamp = (DateTime.now.getMillis / 1000).toInt
-    val theirAddress = NetworkAddress(address, network)
     val myAddress = NetworkAddress(InetAddress.getByName("localhost"), network)
     val userAgent = "/Machinomics:0.0.1"
-    new VersionPayload(version, Services(), timestamp, theirAddress, myAddress, 0, userAgent, 0, false)
+    new VersionPayload(version, Services(), timestamp, address, myAddress, 0, userAgent, 0, false)
   }
 
   type Wire = Int ~ Services ~ Long ~ NetworkAddress ~ NetworkAddress ~ Long ~ String ~ Int ~ Boolean
