@@ -8,8 +8,8 @@ import one.eliot.machinomics.net.Network
 import scala.concurrent.Future
 import scala.util.Try
 
-class DnsDiscovery[A <: DnsSeed](seed: A) extends Discovery[A] with LazyLogging {
-  override def peers(network: Network): Future[Seq[InetSocketAddress]] = {
+class DnsPeerDiscovery(seed: DnsSeed, network: Network) extends PeerDiscovery[DnsSeed] with LazyLogging {
+  override def peers(): Future[Seq[InetSocketAddress]] = {
     Try(InetAddress.getAllByName(seed.hostname)).toOption match {
       case Some(inetAddresses) => {
         logger.info(s"Resolved ${inetAddresses.size} addresses for ${seed.hostname}")

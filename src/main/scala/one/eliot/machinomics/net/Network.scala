@@ -17,10 +17,10 @@ sealed trait Network {
   val protocolVersion = ProtocolVersion.CURRENT
   val genesisHash: DoubleHash
 
-  def peers()(implicit ec: ExecutionContext): Future[Seq[InetSocketAddress]] = {
+  /*def peers()(implicit ec: ExecutionContext): Future[Seq[InetSocketAddress]] = {
     val listOfFutures: Seq[Future[Seq[InetSocketAddress]]] = seeds.map(s => s.discovery.peers(this))
     Future.sequence(listOfFutures).map(_.flatten)
-  }
+  }*/
 }
 
 object Testnet3Network extends Network {
