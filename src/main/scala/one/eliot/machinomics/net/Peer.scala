@@ -10,7 +10,7 @@ import scodec.Attempt.{Failure, Successful}
 import scodec._
 import scodec.bits._
 
-class Peer() extends Actor with ActorLogging {
+class Peer extends Actor with ActorLogging {
 
   import Tcp._
   import context.system
@@ -26,16 +26,16 @@ class Peer() extends Actor with ActorLogging {
   }
 
   def onConnected(state: PeerState.Empty): Receive = { case c @ Connected(r, l) =>
-    log.info(s"Connected to $r")
+    log.info(s"Registered to $r")
     sender ! Register(self)
     sendMessage(state.network, protocol.VersionPayload(state.network, state.address))
-    become(onVersionPayloadReceived, state.initial)
+    become(onVersionPayloadReceived, state.connected)
   }
 
-  def onVersionPayloadReceived(state: PeerState.Initial): Receive = onMessageReceived[protocol.VersionPayload] { payload =>
+  def onVersionPayloadReceived(state: PeerState.Connected): Receive = onMessageReceived[protocol.VersionPayload] { payload =>
     log.info(s"Done version handshake with ${state.address}")
     sendMessage(state.network, protocol.VerackPayload())
-    become(onVerackPayloadReceived, state.connected(
+    become(onVerackPayloadReceived, state.registered(
       selfReportedAddress = payload.myAddress,
       services = payload.services,
       version = payload.version,
@@ -44,7 +44,7 @@ class Peer() extends Actor with ActorLogging {
     ))
   }
 
-  def onVerackPayloadReceived(state: PeerState.Connected): Receive = onMessageReceived[protocol.VerackPayload] { payload =>
+  def onVerackPayloadReceived(state: PeerState.Registered): Receive = onMessageReceived[protocol.VerackPayload] { payload =>
     log.info(s"Acknowledged connection to ${state.address}")
     sendMessage(state.network, protocol.GetHeadersPayload(state.network.genesisHash))
     become(onHeadersReceive, state.acknowledged)
@@ -104,7 +104,7 @@ class Peer() extends Actor with ActorLogging {
 }
 
 object Peer {
-  def props(remote: InetSocketAddress, network: Network) = Props(classOf[Peer], remote, network)
+  def props = Props(classOf[Peer])
 
   sealed trait Message
   case class Connect(remote: InetSocketAddress, network: Network) extends Message
