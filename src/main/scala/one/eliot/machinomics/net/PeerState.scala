@@ -8,15 +8,19 @@ object PeerState{
   }
 
   case class Initial(network: Network, address: NetworkAddress, herd: ActorRef) extends PeerState {
-    def connected = Connected(network, address, herd)
+    def connected(wire: ActorRef) = Connected(network, address, herd, wire)
   }
 
-  case class Connected(network: Network, address: NetworkAddress, herd: ActorRef) extends PeerState {
+  sealed trait Wired {
+    def wire: ActorRef
+  }
+
+  case class Connected(network: Network, address: NetworkAddress, herd: ActorRef, wire: ActorRef) extends PeerState with Wired {
     def registered(selfReportedAddress: NetworkAddress,
                    services: Services,
                    version: ProtocolVersion.Value,
                    userAgent: String,
-                   height: Long) = Registered(network, address, selfReportedAddress, services, version, userAgent, height, herd)
+                   height: Long) = Registered(network, address, selfReportedAddress, services, version, userAgent, height, herd, wire)
   }
 
   case class Registered(network: Network,
@@ -26,9 +30,10 @@ object PeerState{
                         version: ProtocolVersion.Value,
                         userAgent: String,
                         height: Long,
-                        herd: ActorRef) extends PeerState {
+                        herd: ActorRef,
+                        wire: ActorRef) extends PeerState with Wired {
 
-    def acknowledged = Acknowledged(network, address, selfReportedAddress, services, version, userAgent, height, herd)
+    def acknowledged = Acknowledged(network, address, selfReportedAddress, services, version, userAgent, height, herd, wire)
   }
 
   case class Acknowledged(network: Network,
@@ -38,9 +43,10 @@ object PeerState{
                           version: ProtocolVersion.Value,
                           userAgent: String,
                           height: Long,
-                          herd: ActorRef) extends PeerState {
+                          herd: ActorRef,
+                          wire: ActorRef) extends PeerState with Wired {
 
-    def gettingHeaders = GettingHeaders(network, address, selfReportedAddress, services, version, userAgent, height, 0, herd)
+    def gettingHeaders = GettingHeaders(network, address, selfReportedAddress, services, version, userAgent, height, 0, herd, wire)
 
   }
 
@@ -52,10 +58,11 @@ object PeerState{
                             userAgent: String,
                             height: Long,
                             downloadedHeaderCount: Int,
-                            herd: ActorRef) extends PeerState {
+                            herd: ActorRef,
+                            wire: ActorRef) extends PeerState with Wired {
 
-    def acknowledged = Acknowledged(network, address, selfReportedAddress, services, version, userAgent, height, herd)
+    def acknowledged = Acknowledged(network, address, selfReportedAddress, services, version, userAgent, height, herd, wire)
 
-    def next(addCount: Int): GettingHeaders = GettingHeaders(network, address, selfReportedAddress, services, version, userAgent, height, downloadedHeaderCount + addCount, herd)
+    def next(addCount: Int): GettingHeaders = GettingHeaders(network, address, selfReportedAddress, services, version, userAgent, height, downloadedHeaderCount + addCount, herd, wire)
   }
 }

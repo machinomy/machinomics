@@ -27,9 +27,9 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   def onConnected(prevState: PeerState.Initial): Receive = { case c @ Connected(r, l) =>
     log.info(s"DidConnect to $r")
     sender ! Register(self)
-    val currentState = prevState.connected
+    val currentState = prevState.connected(sender)
     notify(currentState, Peer.DidConnect(currentState))
-    sendMessage(prevState.network, protocol.VersionPayload(prevState.network, prevState.address))
+    sendMessage(prevState.network, currentState, protocol.VersionPayload(prevState.network, prevState.address))
     next(onVersionPayloadReceived, currentState)
   }
 
@@ -43,7 +43,7 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
       height = payload.height
     )
     notify(currentState, Peer.DidRegister(currentState))
-    sendMessage(prevState.network, protocol.VerackPayload())
+    sendMessage(prevState.network, currentState, protocol.VerackPayload())
     next(onVerackPayloadReceived, currentState)
   }
 
@@ -56,8 +56,9 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
 
   def receiveAcknowledged(prevState: PeerState.Acknowledged): Receive = {
     case Peer.HeadersQuery() =>
+      log.info("Peer:receiveAcknowledged, case Peer.HeadersQuery")
       val currentState = prevState.gettingHeaders
-      sendMessage(prevState.network, protocol.GetHeadersPayload(prevState.network.genesisHash))
+      sendMessage(prevState.network, currentState, protocol.GetHeadersPayload(prevState.network.genesisHash))
       next(onHeadersReceive, currentState)
   }
 
@@ -67,8 +68,8 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
       val headersSent = payload.headers.takeRight(10)
       log.info(headersSent.map(x => x.hash).mkString("; "))
       log.info(s"last: ${payload.headers.last.hash.toString}, ${payload.headers.last} ${ByteString(payload.headers.last.hash.toString)}")
-      sendMessage(state.network, protocol.GetHeadersPayload(headersSent.map(_.hash)))
       val currentState = state.next(payload.count)
+      sendMessage(state.network, currentState, protocol.GetHeadersPayload(headersSent.map(_.hash)))
       next(onHeadersReceive, currentState)
       notify(currentState, Peer.GotHeaders(currentState, payload.headers))
     } else {
@@ -83,7 +84,7 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   }
 
   def onSomethingUnexpected(state: PeerState.PeerState): Receive = {
-    case e: Received => throw new Peer.ReceivedUnexpectedBytesError(e.data, state)
+    case e: Received => log.error(e.toString) //throw new Peer.ReceivedUnexpectedBytesError(e.data, state)
   }
 
   def next[A <: PeerState.PeerState](behavior: A => Receive, state: A): Unit = context.become(behavior(state) orElse onSomethingUnexpected(state))
@@ -102,12 +103,12 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     }
   }
 
-  def sendMessage[A <: protocol.Payload : Codec](network: Network, payload: A) = {
+  def sendMessage[A <: protocol.Payload : Codec](network: Network, state: PeerState.PeerState with PeerState.Wired, payload: A) = {
     val message = protocol.Message(network, payload)
     log.info(s"Sending $payload on $network")
     for {
       bits <- Codec.encode(message)
-    } yield sender ! Write(bits)
+    } yield state.wire ! Write(bits)
   }
 
   implicit def bitVectorToByteString(bits: BitVector): ByteString = ByteString(bits.toByteArray)

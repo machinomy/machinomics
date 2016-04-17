@@ -1,51 +1,41 @@
 package one.eliot.machinomics.net
 
 import akka.actor.ActorRef
-import one.eliot.machinomics.net.PeerState.GettingHeaders
 
 object HerdState {
 
-  object Factory {
+  case class Status(status: String)
 
-    // TODO: remove hardcode
-    def apply(prevState: HerdState, node: ActorRef, network: Network, mayBePeers: Set[ActorRef], connectedPeers: Set[ActorRef], gettingHeadersPeers: Set[ActorRef]): HerdState = {
-      prevState match {
-        case _: MayBe if connectedPeers.size >= 5 =>
-          new Connected(node, network, mayBePeers, connectedPeers)
+  val EMPTY = Status("empty")
+  val CONNECTING = Status("connecting")
+  val CONNECTED = Status("connected")
+  val GETTING_HEADERS = Status("getting_headers")
 
-        case _: Connected if gettingHeadersPeers.nonEmpty =>
-          new GettingHeaders(node, network, mayBePeers, connectedPeers, gettingHeadersPeers)
-
-        case state => state
-      }
-    }
-
-    def connect(state: HerdState, peer: ActorRef): HerdState = {
-      Factory(state, state.node, state.network, state.mayBePeers - peer, state.connectedPeers + peer, state.gettingHeadersPeers)
-    }
-
-    def sendForHeaders(state: HerdState, peer: ActorRef): HerdState = {
-      Factory(state, state.node, state.network, state.mayBePeers, state.connectedPeers - peer, state.gettingHeadersPeers + peer)
-    }
-
-    def finishGettingHeader(state: HerdState, peer: ActorRef): HerdState = {
-      Factory(state, state.node, state.network, state.mayBePeers, state.connectedPeers + peer, state.gettingHeadersPeers - peer)
-    }
+  def connect(state: HerdState, peer: ActorRef): HerdState = {
+    val newMayBePeers = state.mayBePeers - peer
+    val newConnectedPeers = state.connectedPeers + peer
+    val newStatus = if (newConnectedPeers.size >= 5 && state.gettingHeadersPeers.isEmpty) CONNECTED else state.status
+    new HerdState(state.node, state.network, newStatus, newMayBePeers, newConnectedPeers, state.gettingHeadersPeers)
   }
 
-  sealed trait HerdState {
-    def node: ActorRef
-
-    def network: Network
-
-    def mayBePeers: Set[ActorRef]
-    def connectedPeers: Set[ActorRef]
-    def gettingHeadersPeers: Set[ActorRef]
+  def sendForHeaders(state: HerdState, peer: ActorRef): HerdState = {
+    val newConnectedPeers = state.connectedPeers - peer
+    val newGettingHeadersPeers = state.gettingHeadersPeers + peer
+    val newStatus = if (newGettingHeadersPeers.nonEmpty) GETTING_HEADERS else state.status
+    new HerdState(state.node, state.network, newStatus, state.mayBePeers, newConnectedPeers, newGettingHeadersPeers)
   }
 
-  case class MayBe(node: ActorRef, network: Network, mayBePeers: Set[ActorRef], connectedPeers: Set[ActorRef] = Set.empty, gettingHeadersPeers: Set[ActorRef] = Set.empty) extends HerdState
-
-  case class Connected(node: ActorRef, network: Network, mayBePeers: Set[ActorRef], connectedPeers: Set[ActorRef], gettingHeadersPeers: Set[ActorRef] = Set.empty) extends HerdState
-
-  case class GettingHeaders(node: ActorRef, network: Network, mayBePeers: Set[ActorRef], connectedPeers: Set[ActorRef], gettingHeadersPeers: Set[ActorRef]) extends HerdState
+  def finishGettingHeaders(state: HerdState, peer: ActorRef): HerdState = {
+    val newConnectedPeers = state.connectedPeers + peer
+    val newGettingHeadersPeers = state.gettingHeadersPeers - peer
+    val newStatus = if (newGettingHeadersPeers.isEmpty) CONNECTED else state.status
+    new HerdState(state.node, state.network, newStatus, state.mayBePeers, newConnectedPeers, newGettingHeadersPeers)
+  }
 }
+
+case class HerdState(node: ActorRef,
+                     network: Network,
+                     status: HerdState.Status,
+                     mayBePeers: Set[ActorRef],
+                     connectedPeers: Set[ActorRef] = Set.empty,
+                     gettingHeadersPeers: Set[ActorRef] = Set.empty)
