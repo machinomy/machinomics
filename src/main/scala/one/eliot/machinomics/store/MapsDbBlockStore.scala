@@ -26,4 +26,6 @@ class MapsDbBlockStore extends BlockStore[Block] {
       blockDecodeResult <- Codec.decode[Block](BitVector(retrievedBytes)).toOption
     } yield blockDecodeResult.value
   }
+
+  def close(): Unit = db.close()
 }
