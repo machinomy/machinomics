@@ -11,7 +11,7 @@ trait PeerDiscovery[A <: Seed] {
 
 object PeerDiscovery {
   def forNetwork(network: Network)(implicit ec: ExecutionContext): Future[Seq[InetSocketAddress]] = {
-    val listOfFutures: Seq[Future[Seq[InetSocketAddress]]] = network.seeds.map(s => Seed.discovery(s, network).peers)
+    val listOfFutures: Seq[Future[Seq[InetSocketAddress]]] = network.seeds.map(s => Seed.discovery(s, network).peers())
     Future.sequence(listOfFutures).map(_.flatten)
   }
 }

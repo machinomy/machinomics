@@ -2,11 +2,12 @@ package one.eliot.machinomics.net
 
 import java.net.{Inet4Address, InetSocketAddress}
 
-import akka.actor.{ActorLogging, ActorRef, Actor}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.pattern.ask
 import akka.util.Timeout
+import one.eliot.machinomics.net.discovery.PeerDiscovery
 
-import scala.concurrent.{Future, Await}
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -22,7 +23,8 @@ class Herd(network: Network) extends Actor with ActorLogging {
     case Herd.Connect(peerCount: Int) =>
       val s = sender()
       log.info(s"Starting passive node for ${network.name}")
-      network.peers().onSuccess {
+      val discovered = PeerDiscovery.forNetwork(network)
+      discovered.onSuccess {
         case addresses: Seq[InetSocketAddress] =>
           val selected = Random.shuffle(addresses.filter(_.getAddress.isInstanceOf[Inet4Address])).take(peerCount)
           peers = for (addr <- selected) yield context.actorOf(Peer.props(addr, network))
