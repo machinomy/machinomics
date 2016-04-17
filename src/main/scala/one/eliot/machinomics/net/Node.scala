@@ -19,16 +19,17 @@ class Node(network: Network) extends Actor with ActorLogging {
   }
 
   def onHerdDidHandshake(state: NodeState.Working): Receive = { case Herd.DidHandshake() =>
+    log.info("Herd did handshake")
     state.herd ! Herd.GetHeaders()
     context.become(receivingHeaders(state))
   }
 
   def receivingHeaders(state: NodeState.Working): Receive = {
-    case Peer.GotHeaders(headers) =>
+    case Herd.GotHeaders(headers) =>
       println(s"!!!!!! GOTHEADERS: ${headers.size}")
-    case Peer.GotNoMoreHeaders() =>
-      println("!!!!!! NOMOREHEADERS")
-      context.unbecome()
+//    case Peer.GotNoMoreHeaders() =>
+//      println("!!!!!! NOMOREHEADERS")
+//      context.unbecome()
   }
 }
 

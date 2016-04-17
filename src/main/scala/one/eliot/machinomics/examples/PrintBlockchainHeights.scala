@@ -11,8 +11,10 @@ import one.eliot.machinomics.net.{Herd, Node, Testnet3Network}
 
 object PrintBlockchainHeights extends App {
   implicit val actorSystem = ActorSystem("foo")
-  implicit val timeout = Timeout(1.hour)
+  implicit val timeout = Timeout(10.seconds)
   val network = Testnet3Network
+//  val node = actorSystem.actorOf(Props(classOf[Herd], network))
+
   /*val node = actorSystem.actorOf(Props(classOf[Herd], network))
   node ! Herd.Connect(10)
   node ! Herd.Handshake()

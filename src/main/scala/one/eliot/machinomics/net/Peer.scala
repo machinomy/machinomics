@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor._
 import akka.io.{IO, Tcp}
 import akka.util.{ByteString, ByteStringBuilder}
-import one.eliot.machinomics.net.PeerState
+import one.eliot.machinomics.blockchain.BlockHeader
 import one.eliot.machinomics.net.protocol._
 import scodec.Attempt.{Failure, Successful}
 import scodec._
@@ -18,7 +18,7 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
 
   var _blockHeaderCount = 0
 
-  override def receive = { case Peer.ConnectCommand =>
+  override def receive = { case Peer.ConnectCommand() =>
     IO(Tcp) ! Connect(remote)
     val initialState = PeerState.Initial(network, NetworkAddress(remote, network), sender)
     context.become(onConnected(initialState) orElse onFailedConnection(initialState) orElse onSomethingUnexpected(initialState))
@@ -27,9 +27,9 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   def onConnected(prevState: PeerState.Initial): Receive = { case c @ Connected(r, l) =>
     log.info(s"DidConnect to $r")
     sender ! Register(self)
-    val currentState = prevState.connected
-//    notify(currentState, Peer.DidConnect(currentState))
-    sendMessage(prevState.network, protocol.VersionPayload(prevState.network, prevState.address))
+    val currentState = prevState.connected(sender)
+    notify(currentState, Peer.DidConnect(currentState))
+    sendMessage(prevState.network, currentState, protocol.VersionPayload(prevState.network, prevState.address))
     next(onVersionPayloadReceived, currentState)
   }
 
@@ -42,8 +42,8 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
       userAgent = payload.userAgent,
       height = payload.height
     )
-//    notify(currentState, Peer.DidRegister(currentState))
-    sendMessage(prevState.network, protocol.VerackPayload())
+    notify(currentState, Peer.DidRegister(currentState))
+    sendMessage(prevState.network, currentState, protocol.VerackPayload())
     next(onVerackPayloadReceived, currentState)
   }
 
@@ -54,22 +54,28 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     next(receiveAcknowledged, currentState)
   }
 
-  def receiveAcknowledged(state: PeerState.Acknowledged): Receive = {
+  def receiveAcknowledged(prevState: PeerState.Acknowledged): Receive = {
     case Peer.HeadersQuery() =>
-      sendMessage(state.network, protocol.GetHeadersPayload(state.network.genesisHash))
-      next(onHeadersReceive, state, 0L)
+      log.info("Peer:receiveAcknowledged, case Peer.HeadersQuery")
+      val currentState = prevState.gettingHeaders
+      sendMessage(prevState.network, currentState, protocol.GetHeadersPayload(prevState.network.genesisHash))
+      next(onHeadersReceive, currentState)
   }
 
-  def onHeadersReceive(state: PeerState.Acknowledged, blockHeaderCount: Long = 0): Receive = onMessageReceived[protocol.HeadersPayload](state) { payload =>
-    log.info(s"downloaded: $blockHeaderCount headers")
-    if (blockHeaderCount < state.height) {
+  def onHeadersReceive(state: PeerState.GettingHeaders): Receive = onMessageReceived[protocol.HeadersPayload](state) { payload =>
+    log.info(s"downloaded: ${state.downloadedHeaderCount} headers")
+    if (state.downloadedHeaderCount < state.height) {
       val headersSent = payload.headers.takeRight(10)
       log.info(headersSent.map(x => x.hash).mkString("; "))
       log.info(s"last: ${payload.headers.last.hash.toString}, ${payload.headers.last} ${ByteString(payload.headers.last.hash.toString)}")
-      sendMessage(state.network, protocol.GetHeadersPayload(headersSent.map(_.hash)))
-      next(onHeadersReceive, state, blockHeaderCount + payload.count)
+      val currentState = state.next(payload.count)
+      sendMessage(state.network, currentState, protocol.GetHeadersPayload(headersSent.map(_.hash)))
+      next(onHeadersReceive, currentState)
+      notify(currentState, Peer.GotHeaders(currentState, payload.headers))
     } else {
       log.info(s"last: ${payload.headers.last.hash}, ${payload.headers.last}")
+      val currentState = state.acknowledged
+      notify(currentState, Peer.GotHeaders(currentState, payload.headers))
     }
   }
 
@@ -78,11 +84,10 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
   }
 
   def onSomethingUnexpected(state: PeerState.PeerState): Receive = {
-    case e: Received => throw new Peer.ReceivedUnexpectedBytesError(e.data, state)
+    case e: Received => log.error(e.toString) //throw new Peer.ReceivedUnexpectedBytesError(e.data, state)
   }
 
   def next[A <: PeerState.PeerState](behavior: A => Receive, state: A): Unit = context.become(behavior(state) orElse onSomethingUnexpected(state))
-  def next[A <: PeerState.PeerState, B](behavior: (A, B) => Receive, state: A, arg0: B): Unit = context.become(behavior(state, arg0) orElse onSomethingUnexpected(state))
 
   def notify(state: PeerState.PeerState, message: Peer.Message) = state.herd ! message
 
@@ -98,19 +103,18 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
     }
   }
 
-  def sendMessage[A <: protocol.Payload : Codec](network: Network, payload: A) = {
+  def sendMessage[A <: protocol.Payload : Codec](network: Network, state: PeerState.PeerState with PeerState.Wired, payload: A) = {
     val message = protocol.Message(network, payload)
     log.info(s"Sending $payload on $network")
     for {
       bits <- Codec.encode(message)
-    } yield sender ! Write(bits)
+    } yield state.wire ! Write(bits)
   }
 
   implicit def bitVectorToByteString(bits: BitVector): ByteString = ByteString(bits.toByteArray)
 }
 
 object Peer {
-//  def props = Props(classOf[Peer])
   def props(remote: InetSocketAddress, network: Network) = Props(classOf[Peer], remote, network)
 
   sealed trait Message
@@ -123,6 +127,7 @@ object Peer {
   case class DidConnect(state: PeerState.Connected) extends Notification
   case class DidRegister(state: PeerState.Registered) extends Notification
   case class DidAcknowledge(state: PeerState.Acknowledged) extends Notification
+  case class GotHeaders(state: PeerState.PeerState, headers: List[BlockHeader]) extends Notification
 
   case class Failed(state: PeerState.PeerState) extends Notification
 
