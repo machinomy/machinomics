@@ -18,7 +18,9 @@ class Peer(remote: InetSocketAddress, network: Network) extends Actor with Actor
 
   var _blockHeaderCount = 0
 
-  override def receive = { case Peer.ConnectCommand() =>
+  override def receive = expectConnectCommand
+
+  def expectConnectCommand: Receive = { case Peer.ConnectCommand() =>
     IO(Tcp) ! Connect(remote)
     val initialState = PeerState.Initial(network, NetworkAddress(remote, network), sender)
     context.become(onConnected(initialState) orElse onFailedConnection(initialState) orElse onSomethingUnexpected(initialState))

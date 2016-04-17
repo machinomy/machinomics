@@ -7,7 +7,7 @@ class Node(network: Network) extends Actor with ActorLogging {
 
   def expectStart(state: NodeState.Initial): Receive = { case Node.Start() =>
     val herd = context.actorOf(Herd.props(network))
-    herd ! Herd.Connect(10)
+    herd ! Herd.Connect(state.peersCount)
     val nextState = state.working(herd)
     context.become(onHerdDidConnect(nextState))
   }
@@ -20,8 +20,8 @@ class Node(network: Network) extends Actor with ActorLogging {
 
   def onHerdDidHandshake(state: NodeState.Working): Receive = { case Herd.DidHandshake() =>
     log.info("Herd did handshake")
-    state.herd ! Herd.GetHeaders()
-    context.become(receivingHeaders(state))
+    /*state.herd ! Herd.GetHeaders()
+    context.become(receivingHeaders(state))*/
   }
 
   def receivingHeaders(state: NodeState.Working): Receive = {

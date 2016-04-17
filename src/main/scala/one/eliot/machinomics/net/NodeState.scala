@@ -10,16 +10,18 @@ object NodeState {
                      address: NetworkAddress,
                      services: Services,
                      userAgent: String,
-                     relayBeforeFilter: Boolean) extends NodeState {
+                     relayBeforeFilter: Boolean,
+                     peersCount: Int) extends NodeState {
     def working(herd: ActorRef) = Working(network, address, services, userAgent, relayBeforeFilter, herd)
   }
   object Initial {
-    def forNetwork(network: Network): Initial = new Initial(
+    def forNetwork(network: Network, peersCount: Int = 10): Initial = new Initial(
       network = network,
       address = NetworkAddress(InetAddress.getByName("localhost"), network),
       services = Services(),
       userAgent = "/Machinomics:0.0.1",
-      relayBeforeFilter = false
+      relayBeforeFilter = false,
+      peersCount = peersCount
     )
   }
 
