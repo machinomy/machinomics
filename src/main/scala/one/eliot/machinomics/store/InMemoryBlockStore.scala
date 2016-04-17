@@ -12,7 +12,7 @@ class InMemoryBlockStore extends BlockStore[Block] {
     _collection += (block.header.hash -> block)
   }
 
-  override def get(hash: DoubleHash): Block = {
-    _collection.getOrElse(hash, null)
+  override def get(hash: DoubleHash): Option[Block] = {
+    _collection.get(hash)
   }
 }
