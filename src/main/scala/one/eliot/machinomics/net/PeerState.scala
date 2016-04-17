@@ -38,5 +38,24 @@ object PeerState{
                           version: ProtocolVersion.Value,
                           userAgent: String,
                           height: Long,
-                          herd: ActorRef) extends PeerState
+                          herd: ActorRef) extends PeerState {
+
+    def gettingHeaders = GettingHeaders(network, address, selfReportedAddress, services, version, userAgent, height, 0, herd)
+
+  }
+
+  case class GettingHeaders(network: Network,
+                            address: NetworkAddress,
+                            selfReportedAddress: NetworkAddress,
+                            services: Services,
+                            version: ProtocolVersion.Value,
+                            userAgent: String,
+                            height: Long,
+                            downloadedHeaderCount: Int,
+                            herd: ActorRef) extends PeerState {
+
+    def acknowledged = Acknowledged(network, address, selfReportedAddress, services, version, userAgent, height, herd)
+
+    def next(addCount: Int): GettingHeaders = GettingHeaders(network, address, selfReportedAddress, services, version, userAgent, height, downloadedHeaderCount + addCount, herd)
+  }
 }
