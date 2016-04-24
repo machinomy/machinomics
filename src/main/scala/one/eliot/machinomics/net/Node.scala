@@ -1,9 +1,12 @@
 package one.eliot.machinomics.net
 
 import akka.actor._
+import one.eliot.machinomics.blockchain.Block
+import one.eliot.machinomics.store.MapsDbBlockStore
 
 class Node(network: Network) extends Actor with ActorLogging {
   override def receive: Receive = expectStart(NodeState.Initial.forNetwork(network))
+  val db = new MapsDbBlockStore()
 
   def expectStart(state: NodeState.Initial): Receive = { case Node.Start() =>
     val herd = context.actorOf(Herd.props(network))
@@ -26,10 +29,17 @@ class Node(network: Network) extends Actor with ActorLogging {
 
   def receivingHeaders(state: NodeState.Working): Receive = {
     case Herd.GotHeaders(headers) =>
+      for (h <- headers) {
+        db.put(Block(h, Array.empty))
+      }
       println(s"!!!!!! GOTHEADERS: ${headers.size}")
 //    case Peer.GotNoMoreHeaders() =>
 //      println("!!!!!! NOMOREHEADERS")
 //      context.unbecome()
+  }
+
+  override def postStop(): Unit = {
+    db.close()
   }
 }
 
