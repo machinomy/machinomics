@@ -20,7 +20,7 @@ class Herd(network: Network) extends Actor with ActorLogging {
       discovered.onSuccess {
         case addresses: Seq[InetSocketAddress] =>
           val selected = Random.shuffle(addresses.filter(_.getAddress.isInstanceOf[Inet4Address])).take(peerCount)
-          val peers = for (addr <- selected) yield context.actorOf(PeerConnection.props(addr, network))
+          val peers = for (addr <- selected) yield context.actorOf(PeerConnectionA.props(addr, network))
           val initialState = new HerdState(s, network, HerdState.EMPTY, peers.toSet)
           next(initialState)
           notify(initialState, Herd.DidConnect())
@@ -33,11 +33,11 @@ class Herd(network: Network) extends Actor with ActorLogging {
     case Herd.Handshake() =>
       log.info(s"Start handshaking with ${state.mayBePeers.size} peers")
       next(state.copy(status = HerdState.CONNECTING))
-      for (peer <- state.mayBePeers) { peer ! PeerConnection.ConnectCommand() }
+      for (peer <- state.mayBePeers) { peer ! PeerConnectionA.ConnectCommand() }
   }
 
   def onConnecting(state: HerdState): Receive = {
-    case PeerConnection.DidAcknowledge(peerState) =>
+    case PeerConnectionA.DidAcknowledge(peerState) =>
       log.info(s"Received acknowledgement from ${peerState.address}")
       val nextState = HerdState.connect(state, sender())
       if (nextState.status == HerdState.CONNECTED && state.status == HerdState.CONNECTING) {
@@ -51,13 +51,13 @@ class Herd(network: Network) extends Actor with ActorLogging {
   def onConnected(state: HerdState): Receive = {
     case Herd.GetHeaders() =>
       for (peer <- state.connectedPeers) {
-        peer ! PeerConnection.HeadersQuery()
+        peer ! PeerConnectionA.HeadersQuery()
         next(HerdState.sendForHeaders(state, peer))
       }
   }
 
   def onGettingHeaders(state: HerdState): Receive = {
-    case PeerConnection.GotHeaders(peerState, headers) =>
+    case PeerConnectionA.GotHeaders(peerState, headers) =>
       log.info(s"Getting ${headers.length} headers")
       peerState match {
         case peerState: PeerState.GettingHeaders =>

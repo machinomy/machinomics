@@ -11,7 +11,7 @@ import scodec.Attempt.{Failure, Successful}
 import scodec._
 import scodec.bits._
 
-class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor with ActorLogging {
+class PeerConnectionA(remote: InetSocketAddress, network: Network) extends Actor with ActorLogging {
 
   import Tcp._
   import context.system
@@ -20,7 +20,7 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
 
   override def receive = expectConnectCommand
 
-  def expectConnectCommand: Receive = { case PeerConnection.ConnectCommand() =>
+  def expectConnectCommand: Receive = { case PeerConnectionA.ConnectCommand() =>
     IO(Tcp) ! Connect(remote)
     val initialState = PeerState.Initial(network, NetworkAddress(remote, network), sender)
     context.become(onConnected(initialState) orElse onFailedConnection(initialState) orElse onSomethingUnexpected(initialState))
@@ -30,7 +30,7 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
     log.info(s"DidConnect to $r")
     sender ! Register(self)
     val currentState = prevState.connected(sender)
-    notify(currentState, PeerConnection.DidConnect(currentState))
+    notify(currentState, PeerConnectionA.DidConnect(currentState))
     sendMessage(prevState.network, currentState, protocol.VersionPayload(prevState.network, prevState.address))
     next(onVersionPayloadReceived, currentState)
   }
@@ -44,7 +44,7 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
       userAgent = payload.userAgent,
       height = payload.height
     )
-    notify(currentState, PeerConnection.DidRegister(currentState))
+    notify(currentState, PeerConnectionA.DidRegister(currentState))
     sendMessage(prevState.network, currentState, protocol.VerackPayload())
     next(onVerackPayloadReceived, currentState)
   }
@@ -52,13 +52,13 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
   def onVerackPayloadReceived(prevState: PeerState.Registered): Receive = onMessageReceived[protocol.VerackPayload](prevState) { payload =>
     log.info(s"Acknowledged connection to ${prevState.address}")
     val currentState = prevState.acknowledged
-    notify(currentState, PeerConnection.DidAcknowledge(currentState))
+    notify(currentState, PeerConnectionA.DidAcknowledge(currentState))
     next(receiveAcknowledged, currentState)
   }
 
   def receiveAcknowledged(prevState: PeerState.Acknowledged): Receive = {
-    case PeerConnection.HeadersQuery() =>
-      log.info("PeerConnection:receiveAcknowledged, case PeerConnection.HeadersQuery")
+    case PeerConnectionA.HeadersQuery() =>
+      log.info("PeerConnectionA:receiveAcknowledged, case PeerConnectionA.HeadersQuery")
       val currentState = prevState.gettingHeaders
       sendMessage(prevState.network, currentState, protocol.GetHeadersPayload(prevState.network.genesisHash))
       next(onHeadersReceive, currentState)
@@ -73,11 +73,11 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
       val currentState = state.next(payload.count)
       sendMessage(state.network, currentState, protocol.GetHeadersPayload(headersSent.map(_.hash)))
       next(onHeadersReceive, currentState)
-      notify(currentState, PeerConnection.GotHeaders(currentState, payload.headers))
+      notify(currentState, PeerConnectionA.GotHeaders(currentState, payload.headers))
     } else {
       log.info(s"last: ${payload.headers.last.hash}, ${payload.headers.last}")
       val currentState = state.acknowledged
-      notify(currentState, PeerConnection.GotHeaders(currentState, payload.headers))
+      notify(currentState, PeerConnectionA.GotHeaders(currentState, payload.headers))
     }
   }
 
@@ -86,12 +86,12 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
   }
 
   def onSomethingUnexpected(state: PeerState.PeerState): Receive = {
-    case e: Received => log.error(e.toString) //throw new PeerConnection.ReceivedUnexpectedBytesError(e.data, state)
+    case e: Received => log.error(e.toString) //throw new PeerConnectionA.ReceivedUnexpectedBytesError(e.data, state)
   }
 
   def next[A <: PeerState.PeerState](behavior: A => Receive, state: A): Unit = context.become(behavior(state) orElse onSomethingUnexpected(state))
 
-  def notify(state: PeerState.PeerState, message: PeerConnection.Message) = state.herd ! message
+  def notify(state: PeerState.PeerState, message: PeerConnectionA.Message) = state.herd ! message
 
   def onMessageReceived[A <: Payload : Codec](state: PeerState.PeerState)(f: A => Unit, buffer: ByteStringBuilder = ByteString.newBuilder): Receive = { case Received(blob) =>
     buffer.append(blob)
@@ -116,8 +116,8 @@ class PeerConnection(remote: InetSocketAddress, network: Network) extends Actor 
   implicit def bitVectorToByteString(bits: BitVector): ByteString = ByteString(bits.toByteArray)
 }
 
-object PeerConnection {
-  def props(remote: InetSocketAddress, network: Network) = Props(classOf[PeerConnection], remote, network)
+object PeerConnectionA {
+  def props(remote: InetSocketAddress, network: Network) = Props(classOf[PeerConnectionA], remote, network)
 
   sealed trait Message
   sealed trait Command extends Message

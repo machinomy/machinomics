@@ -33,7 +33,7 @@ class Node(network: Network) extends Actor with ActorLogging {
         db.put(Block(h, Array.empty))
       }
       println(s"!!!!!! GOTHEADERS: ${headers.size}")
-//    case PeerConnection.GotNoMoreHeaders() =>
+//    case PeerConnectionA.GotNoMoreHeaders() =>
 //      println("!!!!!! NOMOREHEADERS")
 //      context.unbecome()
   }
