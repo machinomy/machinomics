@@ -11,6 +11,8 @@ import scodec.Attempt.{Failure, Successful}
 import scodec._
 import scodec.bits._
 
+import scala.language.implicitConversions
+
 class PeerConnectionA(remote: InetSocketAddress, network: Network) extends Actor with ActorLogging {
 
   import Tcp._
