@@ -7,11 +7,11 @@ import akka.util.Timeout
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
-import one.eliot.machinomics.net.{Herd, Node, Testnet3Network}
+import one.eliot.machinomics.net.{Herd, NodeA$, Testnet3Network}
 
 object PrintBlockchainHeights extends App {
   implicit val actorSystem = ActorSystem("foo")
   val network = Testnet3Network
-  val node = actorSystem.actorOf(Node.props(network))
-  node ! Node.Start()
+  val node = actorSystem.actorOf(NodeA.props(network))
+  node ! NodeA.Start()
 }

@@ -4,11 +4,11 @@ import akka.actor._
 import one.eliot.machinomics.blockchain.Block
 import one.eliot.machinomics.store.MapsDbBlockStore
 
-class Node(network: Network) extends Actor with ActorLogging {
+class NodeA(network: Network) extends Actor with ActorLogging {
   override def receive: Receive = expectStart(NodeState.Initial.forNetwork(network))
   val db = new MapsDbBlockStore()
 
-  def expectStart(state: NodeState.Initial): Receive = { case Node.Start() =>
+  def expectStart(state: NodeState.Initial): Receive = { case NodeA.Start() =>
     val herd = context.actorOf(Herd.props(network))
     herd ! Herd.Connect(state.peersCount)
     val nextState = state.working(herd)
@@ -43,8 +43,8 @@ class Node(network: Network) extends Actor with ActorLogging {
   }
 }
 
-object Node {
-  def props(network: Network): Props = Props(classOf[Node], network)
+object NodeA {
+  def props(network: Network): Props = Props(classOf[NodeA], network)
 
   sealed trait Message
   case class Start() extends Message
